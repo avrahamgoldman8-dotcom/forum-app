@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  MEMBER
+  MODERATOR
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(MEMBER)
+  createdAt    DateTime @default(now())
+
+  threads Thread[]
+  posts   Post[]
+}
+
+// A Forum with parentId == null is a MAIN forum (top-level category).
+// A Forum with a parentId is a SECONDARY forum (subforum) that belongs
+// to a main forum. Threads can be posted directly into either level.
+model Forum {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  parentId String?
+  parent   Forum?  @relation("ForumTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Forum[] @relation("ForumTree")
+
+  threads Thread[]
+
+  @@index([parentId])
+}
+
+model Thread {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String
+  pinned    Boolean  @default(false)
+  locked    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  forumId String
+  forum   Forum  @relation(fields: [forumId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  posts Post[]
+
+  @@unique([forumId, slug])
+  @@index([forumId])
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  threadId String
+  thread   Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  @@index([threadId])
+}
